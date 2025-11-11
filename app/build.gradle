@@ -26,14 +26,10 @@ android {
         }
     }
     
-    // 修复 AAPT2 资源编译问题和资源重复问题
+    // 修复 AAPT 资源编译问题 - 使用旧版 AAPT
     aaptOptions {
         cruncherEnabled = false
         ignoreAssetsPattern '!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~'
-        additionalParameters '--no-version-vectors',
-                           '--no-version-transitions',
-                           '--warn-manifest-validation',
-                           '--legacy'
     }
     
     packagingOptions {
