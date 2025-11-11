@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout android:theme="@style/Theme.Vcamera2" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent">
+        <LinearLayout android:orientation="vertical" android:background="@drawable/rounded_bg" android:padding="28.0dip" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_margin="12.0dip" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent">
+            <TextView android:textSize="18.0dip" android:id="@id/textView" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dip" android:text="最新版本:" />
+            <TextView android:textSize="16.0dip" android:autoLink="none" android:linksClickable="true" android:id="@id/contact" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="欢迎使用18.81版本Apex三色相机" android:textIsSelectable="true" />
+            <TextView android:textSize="18.0dip" android:id="@id/textView3" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="80.0dip" android:layout_marginBottom="10.0dip" android:text="友情提示:" />
+            <TextView android:textSize="14.0dip" android:autoLink="none" android:linksClickable="true" android:id="@id/notice" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="此应用仅提供用于技术交流及娱乐互动！您应为自己在使用本软件过程中的所有行为负责，并确保其符合所有适用的法律法规。您使用本软件及因其产生的任何风险均由您自行承担。对于因使用或无法使用本软件而导致的任何直接、间接、附带、特殊或后果性的损害（包括但不限于数据丢失、利润损失、业务中断等），开发者及提供者不承担任何责任。" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

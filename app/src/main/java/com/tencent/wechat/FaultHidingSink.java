@@ -1,0 +1,58 @@
+package com.tencent.wechat;
+
+import com.Buffer;
+import com.ForwardingSink;
+import com.Sink;
+import java.io.IOException;
+
+/* loaded from: classes.dex */
+class FaultHidingSink extends ForwardingSink {
+    private boolean hasErrors;
+
+    public FaultHidingSink(Sink sink) {
+        super(sink);
+    }
+
+    @Override // com.ForwardingSink, com.Sink, java.io.Closeable, java.lang.AutoCloseable
+    public void close() throws IOException {
+        if (this.hasErrors) {
+            return;
+        }
+        try {
+            super.close();
+        } catch (IOException e2) {
+            this.hasErrors = true;
+            onException(e2);
+        }
+    }
+
+    @Override // com.ForwardingSink, com.Sink, java.io.Flushable
+    public void flush() throws IOException {
+        if (this.hasErrors) {
+            return;
+        }
+        try {
+            super.flush();
+        } catch (IOException e2) {
+            this.hasErrors = true;
+            onException(e2);
+        }
+    }
+
+    protected void onException(IOException iOException) {
+    }
+
+    @Override // com.ForwardingSink, com.Sink
+    public void write(Buffer buffer, long j2) throws IOException {
+        if (this.hasErrors) {
+            buffer.skip(j2);
+            return;
+        }
+        try {
+            super.write(buffer, j2);
+        } catch (IOException e2) {
+            this.hasErrors = true;
+            onException(e2);
+        }
+    }
+}
