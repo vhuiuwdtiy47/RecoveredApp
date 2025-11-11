@@ -10,59 +10,52 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17 + Gradle cache
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
-      - name: Cache Android SDK
-        uses: actions/cache@v4
-        with:
-          path: ~/android-sdk
-          key: android-sdk-${{ runner.os }}-33-30.0.3-v1
-          restore-keys: |
-            android-sdk-${{ runner.os }}-
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Install commandline-tools & SDK components (manual)
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install SDK packages
         run: |
-          set -e
-          export ANDROID_SDK_ROOT="$HOME/android-sdk"
-          export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools" || true
-          if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ]; then
-            echo 'Downloading commandline-tools...'
-            curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdtools.zip
-            unzip -q /tmp/cmdtools.zip -d /tmp/cmdtools
-            mv /tmp/cmdtools/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-          fi
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
-          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-33" "build-tools;30.0.3"
-          echo 'Build-tools:'; ls -1 "$ANDROID_SDK_ROOT/build-tools"
-          echo 'Platforms:'; ls -1 "$ANDROID_SDK_ROOT/platforms"
-
-      - name: Normalize gradlew & verify
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;30.0.3"
+          
+      - name: Normalize gradlew
         run: |
-          sed -i 's/\r$//' gradlew
           chmod +x gradlew
           ./gradlew --version
 
-      - name: Resolve dependencies (configuration)
-        run: ./gradlew help --info --no-daemon
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Assemble Debug APK
-        run: ./gradlew assembleDebug --stacktrace --info --no-daemon
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
+        continue-on-error: true
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
