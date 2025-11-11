@@ -27,17 +27,9 @@ android {
     }
     
     // 修复 AAPT2 资源编译问题和资源重复问题
-    androidResources {
-        noCompress 'dat', 'bin', 'conf'
-        // 忽略重复资源，使用第一个找到的
-        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-    }
-    
-    // 添加 AAPT 选项以处理大量资源和重复资源
     aaptOptions {
-        noCompress 'dat', 'bin', 'conf'
-        ignoreAssetsPattern '!.svn:!.git:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~'
-        cruncherEnabled false
+        cruncherEnabled = false
+        additionalParameters '--disable-resource-validation'
     }
     
     packagingOptions {
