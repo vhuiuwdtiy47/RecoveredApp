@@ -11,69 +11,60 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      ANDROID_HOME: /usr/local/lib/android/sdk
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17 (Temurin) with Gradle cache
+      - name: Set up JDK 17 (Temurin) + Gradle cache
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+          distribution: temurin
+          java-version: 17
+          cache: gradle
 
-      - name: Show Java & environment info
+      - name: Install Android SDK (action)
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 33
+          build-tools: 30.0.3
+          profile: minimal
+          cmake: false
+
+      - name: Accept Android licenses (redundant safety)
+        run: yes | sdkmanager --licenses || true
+
+      - name: Environment diagnostics
         run: |
           java -version
-          echo "Runner: $(uname -a)"
-          echo "Workspace: $GITHUB_WORKSPACE"
-          ls -1
+          echo "SDK root: $ANDROID_HOME"; ls -1 $ANDROID_HOME/platforms || true
+          echo "Build-tools:"; ls -1 $ANDROID_HOME/build-tools || true
+          echo "Files in repo root:"; ls -1
 
-      - name: Prepare Android SDK components
+      - name: Normalize gradlew & verify wrapper
         run: |
-          echo "Existing SDK root: $ANDROID_SDK_ROOT"
-          ls -1 $ANDROID_SDK_ROOT || true
-          SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMGR" ]; then
-            echo "cmdline-tools (latest) not found; listing available directories:";
-            find $ANDROID_SDK_ROOT -maxdepth 3 -type f -name sdkmanager || true
-            # Fallback: attempt to install commandline-tools
-            mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-            curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -o /tmp/cmdtools.zip
-            unzip -q /tmp/cmdtools.zip -d /tmp/cmdtools
-            mv /tmp/cmdtools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
-            SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          fi
-          chmod +x $SDKMGR || true
-          yes | $SDKMGR --licenses > /dev/null 2>&1 || true
-          $SDKMGR "platforms;android-33" "build-tools;30.0.3" "platform-tools" || true
-          echo "Installed build-tools:"; ls -1 $ANDROID_SDK_ROOT/build-tools || true
-
-      - name: Fix gradlew line endings and permissions
-        run: |
-          # 处理行尾: 若 dos2unix 不存在, 使用 sed 兜底
-          (command -v dos2unix >/dev/null 2>&1 && dos2unix gradlew) || sed -i 's/\r$//' gradlew
+          sed -i 's/\r$//' gradlew
           chmod +x gradlew
-          head -n 20 gradlew | sed -n '1,5p'
+          ./gradlew --version --console=plain
 
-      - name: Verify Gradle wrapper
+      - name: Gradle dependency download (configuration phase)
+        run: ./gradlew help --console=plain --info --no-daemon
+
+      - name: Build Debug APK (retry logic)
         run: |
-          ./gradlew --version || (echo 'Gradle wrapper failed' && exit 1)
-
-      - name: Assemble Debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon --warning-mode all
+          set -e
+          attempt() { echo "=== Attempt $1 ==="; ./gradlew assembleDebug --console=plain --info --stacktrace --no-daemon || return 1; }
+          attempt 1 || (echo 'Retry after failure...' && sleep 5 && attempt 2)
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
-      - name: Assemble Release APK (unsigned)
-        run: ./gradlew assembleRelease --stacktrace --no-daemon --warning-mode all
+      - name: Build Release APK (unsigned)
+        run: ./gradlew assembleRelease --console=plain --info --stacktrace --no-daemon
         continue-on-error: true
 
       - name: Upload Release APK
@@ -84,7 +75,7 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: ignore
 
-      - name: Upload build reports (always)
+      - name: Upload build reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -94,8 +85,13 @@ jobs:
             app/build/outputs/logs
           if-no-files-found: ignore
 
-      - name: Post-build diagnostics (on failure)
+      - name: Failure diagnostics
         if: failure()
         run: |
-          echo 'Listing tree for app/build (depth 3):'
-          find app/build -maxdepth 3 -type f | head -n 200 || true
+          echo '==== BEGIN FAILURE DIAGNOSTICS ===='
+          ./gradlew --stacktrace --version || true
+          echo 'Tree (depth 2) of app/build/outputs:'
+          find app/build/outputs -maxdepth 2 -type f | head -n 200 || true
+          echo 'Listing merged resources (if exists):'
+          find app/build/intermediates/ -name merged.dir -type d 2>/dev/null | head -n 5 || true
+          echo '==== END FAILURE DIAGNOSTICS ===='
