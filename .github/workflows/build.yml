@@ -10,38 +10,92 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        
-    - name: Fix gradlew line endings and permissions
-      run: |
-        dos2unix gradlew 2>/dev/null || sed -i 's/\r$//' gradlew
-        chmod +x gradlew
-      
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace
-      
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
-        
-    - name: Build Release APK (optional)
-      run: ./gradlew assembleRelease --stacktrace
-      continue-on-error: true
-      
-    - name: Upload Release APK
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: app-release
-        path: app/build/outputs/apk/release/*.apk
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin) with Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Show Java & environment info
+        run: |
+          java -version
+          echo "Runner: $(uname -a)"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -1
+
+      - name: Prepare Android SDK components
+        run: |
+          echo "Existing SDK root: $ANDROID_SDK_ROOT"
+          ls -1 $ANDROID_SDK_ROOT || true
+          SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMGR" ]; then
+            echo "cmdline-tools (latest) not found; listing available directories:";
+            find $ANDROID_SDK_ROOT -maxdepth 3 -type f -name sdkmanager || true
+            # Fallback: attempt to install commandline-tools
+            mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+            curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -o /tmp/cmdtools.zip
+            unzip -q /tmp/cmdtools.zip -d /tmp/cmdtools
+            mv /tmp/cmdtools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+            SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          chmod +x $SDKMGR || true
+          yes | $SDKMGR --licenses > /dev/null 2>&1 || true
+          $SDKMGR "platforms;android-33" "build-tools;30.0.3" "platform-tools" || true
+          echo "Installed build-tools:"; ls -1 $ANDROID_SDK_ROOT/build-tools || true
+
+      - name: Fix gradlew line endings and permissions
+        run: |
+          # 处理行尾: 若 dos2unix 不存在, 使用 sed 兜底
+          (command -v dos2unix >/dev/null 2>&1 && dos2unix gradlew) || sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          head -n 20 gradlew | sed -n '1,5p'
+
+      - name: Verify Gradle wrapper
+        run: |
+          ./gradlew --version || (echo 'Gradle wrapper failed' && exit 1)
+
+      - name: Assemble Debug APK
+        run: ./gradlew assembleDebug --stacktrace --no-daemon --warning-mode all
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Assemble Release APK (unsigned)
+        run: ./gradlew assembleRelease --stacktrace --no-daemon --warning-mode all
+        continue-on-error: true
+
+      - name: Upload Release APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+
+      - name: Upload build reports (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            app/build/reports
+            app/build/outputs/logs
+          if-no-files-found: ignore
+
+      - name: Post-build diagnostics (on failure)
+        if: failure()
+        run: |
+          echo 'Listing tree for app/build (depth 3):'
+          find app/build -maxdepth 3 -type f | head -n 200 || true
