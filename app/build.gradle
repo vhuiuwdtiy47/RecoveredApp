@@ -1,18 +1,14 @@
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 android {
-    namespace 'com.android.music'
-    compileSdk 33
-    // 降级 buildToolsVersion 以规避 aapt2 在 Windows 上的虚拟路径冒号问题
+    compileSdkVersion 33
     buildToolsVersion '30.0.3'
 
     defaultConfig {
         applicationId "com.android.music"
-        minSdk 29
-        targetSdk 33
+        minSdkVersion 29
+        targetSdkVersion 33
         versionCode 1
         versionName "18.81"
 
@@ -26,7 +22,7 @@ android {
         }
     }
     
-    // 修复 AAPT 资源编译问题 - 使用旧版 AAPT
+    // 使用旧版 AAPT（AGP 4.2.2 仍然支持）
     aaptOptions {
         cruncherEnabled = false
         ignoreAssetsPattern '!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~'
